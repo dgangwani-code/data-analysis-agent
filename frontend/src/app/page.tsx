@@ -1,77 +1,51 @@
 'use client'
 
 import { useState } from 'react'
+import UploadZone, { type DatasetProfileData } from '@/components/UploadZone'
+import ProfilePanel from '@/components/ProfilePanel'
+import {
+  ExportButtonStub,
+  SessionHistoryStub,
+} from '@/components/StubPanels'
+import ChatThread from '@/components/ChatThread'
 
 export default function Home() {
-  const [input, setInput] = useState('')
-  const [result, setResult] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [profile, setProfile] = useState<DatasetProfileData | null>(null)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!input.trim()) return
-    setLoading(true)
-    setError(null)
-    setResult(null)
-    try {
-      const res = await fetch('/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input_text: input }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.detail?.message ?? `Request failed (${res.status})`)
-      } else if (data.data?.error) {
-        setError(data.data.error)
-      } else {
-        setResult(data.data.output_text)
-      }
-    } catch {
-      setError('Network error — is the server running?')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const sessionId = profile?.session_id ?? null
+  const datasetId = profile?.dataset_id ?? null
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-16">
-      <h1 className="mb-8 text-3xl font-bold tracking-tight">Agent</h1>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <textarea
-          className="w-full rounded-lg border border-gray-300 p-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          rows={4}
-          placeholder="Enter text to transform…"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          disabled={loading}
-        />
-        <button
-          type="submit"
-          disabled={loading || !input.trim()}
-          className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? 'Running…' : 'Run'}
-        </button>
-      </form>
-
-      {error && (
-        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
+    <main className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-8 md:h-screen md:flex-row md:overflow-hidden">
+      {/* Left / top panel — sidebar rail + upload + profile + stub tabs */}
+      <section className="flex w-full flex-col gap-6 md:h-full md:w-[420px] md:shrink-0 md:overflow-y-auto md:pr-2">
+        <div>
+          <h1 className="mb-1 text-2xl font-bold tracking-tight text-gray-900">
+            Data Analysis Agent
+          </h1>
+          <p className="text-sm text-gray-500">
+            Upload a dataset, see it profiled instantly, then ask questions about it.
+          </p>
         </div>
-      )}
 
-      {result && (
-        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 text-sm whitespace-pre-wrap shadow-sm">
-          {result}
+        <SessionHistoryStub />
+
+        <UploadZone sessionId={sessionId} onUploaded={setProfile} />
+
+        <ProfilePanel profile={profile} />
+      </section>
+
+      {/* Right / main panel — chat thread */}
+      <section className="flex min-h-[60vh] w-full flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm md:h-full">
+        <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+          <h2 className="text-sm font-semibold text-gray-700">Chat</h2>
+          <ExportButtonStub />
+        </header>
+
+        <div className="flex-1 overflow-hidden">
+          <ChatThread sessionId={sessionId} datasetId={datasetId} />
         </div>
-      )}
-
-      {!result && !error && !loading && (
-        <p className="mt-10 text-center text-sm text-gray-400">Results will appear here.</p>
-      )}
+      </section>
     </main>
   )
 }

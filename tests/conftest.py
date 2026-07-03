@@ -10,19 +10,31 @@ def _reset_settings_singleton():
 
 
 @pytest.fixture(autouse=True)
-def _isolated_db(tmp_path, monkeypatch):
+def _isolated_db(monkeypatch):
+    """Isolated test DB against the real production driver (PostgreSQL).
+
+    The schema includes JSONB columns (Postgres-specific), so SQLite cannot
+    compile `CREATE TABLE` for it — per the production-DB-driver rule, tests
+    always run against the real PostgreSQL instance from AGENT_DATABASE_URL,
+    never a SQLite substitute. Each test gets a clean slate via truncation
+    (not table drop/create) to keep the fixture fast.
+    """
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from db.models import Base
     import db.session as session_module
+    from config.settings import get_settings
 
-    engine = create_engine(f"sqlite:///{tmp_path}/test.db")
-    Base.metadata.create_all(engine)
+    engine = create_engine(get_settings().database_url, echo=False)
+    Base.metadata.create_all(engine, checkfirst=True)
     factory = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     monkeypatch.setattr(session_module, "_engine", engine)
     monkeypatch.setattr(session_module, "_SessionLocal", factory)
     monkeypatch.setattr(session_module, "init_db", lambda: None)
     yield engine
+    with engine.begin() as conn:
+        for table in reversed(Base.metadata.sorted_tables):
+            conn.execute(table.delete())
     engine.dispose()
 
 
